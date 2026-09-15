@@ -11,7 +11,7 @@ Not a generic recommender. Not a peer reviewer. The goal is narrower and harder:
 **turn a few hundred noisy submissions into a short, trustworthy, explainable reading queue —
 and get better at it every week.**
 
-[![CI](https://github.com/OWNER/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml)
+[![CI](https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml/badge.svg)](https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
 [![Tests](https://img.shields.io/badge/tests-38%20offline-brightgreen.svg)](tests/test_agent.py)
@@ -53,7 +53,7 @@ Requires Python 3.10+ (developed on 3.12). The runtime has **no third-party depe
 everything is standard library until you pick a model backend.
 
 ```bash
-git clone https://github.com/OWNER/Daily_Arxiv_in_My_Domain.git
+git clone https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain.git
 cd Daily_Arxiv_in_My_Domain
 python -m venv .venv && source .venv/bin/activate    # Windows: .\.venv\Scripts\Activate.ps1
 pip install -e ".[openai,fulltext]"                  # openai SDK + pypdf (PDF fallback)

@@ -56,4 +56,4 @@ were private iterations of the same pipeline.
 - Removed `ranking.py`: dead code that referenced fields which do not exist and would
   have crashed if it had ever been called.
 
-[0.3.0]: https://github.com/OWNER/Daily_Arxiv_in_My_Domain/releases/tag/v0.3.0
+[0.3.0]: https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/releases/tag/v0.3.0

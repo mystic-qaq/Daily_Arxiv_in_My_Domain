@@ -42,10 +42,10 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 arxiv-agent = "arxiv_agent.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/OWNER/Daily_Arxiv_in_My_Domain"
-Repository = "https://github.com/OWNER/Daily_Arxiv_in_My_Domain"
-Issues = "https://github.com/OWNER/Daily_Arxiv_in_My_Domain/issues"
-Changelog = "https://github.com/OWNER/Daily_Arxiv_in_My_Domain/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain"
+Repository = "https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain"
+Issues = "https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/issues"
+Changelog = "https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

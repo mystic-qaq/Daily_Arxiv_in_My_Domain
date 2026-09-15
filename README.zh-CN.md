@@ -11,7 +11,7 @@
 不是通用推荐器，也不是审稿人。目标更窄，也更难：
 **把几百篇鱼龙混杂的投稿，变成一份简短、可信、可解释的阅读队列——并且每周都比上一周做得更好。**
 
-[![CI](https://github.com/OWNER/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml)
+[![CI](https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml/badge.svg)](https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
 [![Tests](https://img.shields.io/badge/tests-38%20offline-brightgreen.svg)](tests/test_agent.py)
@@ -49,7 +49,7 @@ arXiv 是一个研究领域被裁决的地方，却也是一个糟糕透顶的�
 标准库。
 
 ```bash
-git clone https://github.com/OWNER/Daily_Arxiv_in_My_Domain.git
+git clone https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain.git
 cd Daily_Arxiv_in_My_Domain
 python -m venv .venv && source .venv/bin/activate    # Windows: .\.venv\Scripts\Activate.ps1
 pip install -e ".[openai,fulltext]"                  # openai SDK + pypdf (PDF fallback)

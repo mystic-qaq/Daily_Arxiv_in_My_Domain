@@ -11,8 +11,8 @@ type: software
 version: 0.3.0
 date-released: "2026-09-15"
 license: MIT
-repository-code: "https://github.com/OWNER/Daily_Arxiv_in_My_Domain"
-url: "https://github.com/OWNER/Daily_Arxiv_in_My_Domain"
+repository-code: "https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain"
+url: "https://github.com/mystic-qaq/Daily_Arxiv_in_My_Domain"
 keywords:
   - arxiv
   - literature-review
