@@ -1,0 +1,8 @@
+# Normalise line endings in the repository so Windows and POSIX contributors
+# produce identical diffs.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.docx binary

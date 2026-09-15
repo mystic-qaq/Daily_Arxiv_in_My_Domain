@@ -1,0 +1,46 @@
+# --- Secrets ---------------------------------------------------------------
+# Never commit credentials. .env.example is the tracked template.
+.env
+.env.*
+!.env.example
+
+# --- Agent state (personal, per-machine) -----------------------------------
+# Contains the evolved strategy, the seen-paper list, raw feedback and the
+# arXiv fetch cache. This is *your* research memory, not project source.
+.arxiv-agent/
+.publish-check/
+
+# --- Generated output ------------------------------------------------------
+# Daily digests are generated artifacts. `examples/` holds the tracked samples.
+reports/
+*.report.md
+
+# --- Local scratch / experiments from earlier iterations -------------------
+live-test*/
+smoke-*/
+
+# --- Superseded notes ------------------------------------------------------
+# The pre-implementation brief. Its domain content lives in profile.py and its
+# reasoning in docs/DESIGN.md; the raw file is the author's private notes.
+/TASK.md
+
+# --- Python ----------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+
+# --- Editors / OS ----------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

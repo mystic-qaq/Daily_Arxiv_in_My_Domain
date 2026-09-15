@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a new signal, a new stage, or a better selection policy.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project optimises for one thing: **the fraction of the digest you actually want to read**.
+        The most persuasive feature requests explain how a change moves that number.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the failure mode you keep hitting, not just the feature you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Where would it live in the pipeline (screening / jury / allocation / reading / report)?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cost
+    attributes:
+      label: Expected cost impact
+      description: Every extra model call is paid for in wall-clock time on a daily run.
+      options:
+        - No extra model calls (deterministic / metadata only)
+        - Adds a small number of calls
+        - Adds calls proportional to the number of candidates
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Including "do nothing" — sometimes the honest answer.
+    validations:
+      required: false

@@ -1,0 +1,74 @@
+name: Bug report
+description: Something broke — a crash, a wrong date, a missing paper, a bad report.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. The two most useful things you can include
+        are the **exact command** you ran and the **relevant block of the generated report**.
+
+        ⚠️ Please redact API keys, tokens and any personal research interests you do not want public.
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command line, including flags.
+      render: shell
+      placeholder: arxiv-agent work --days 2 --target 10
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste the traceback if there is one. `ARXIV_AGENT_DEBUG=1` prints full stack traces.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: "0.3.0 (or the commit hash)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Model backend
+      options:
+        - openai-compatible HTTP endpoint
+        - CLI gateway
+        - offline (--offline)
+        - other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: OS and Python version
+      placeholder: "Windows 11, Python 3.12.7"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed API keys, tokens and personal notes from the output I pasted.
+          required: true
+        - label: I understand the digest is model-generated and individual paper claims must be verified against the original paper.
+          required: true
