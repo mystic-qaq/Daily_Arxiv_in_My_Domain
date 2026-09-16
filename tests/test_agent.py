@@ -551,3 +551,47 @@ def test_output_guard_only_touches_streams_that_cannot_encode_chinese(monkeypatc
     cli._make_output_safe()
     assert western.reconfigured == {"encoding": "utf-8", "errors": "replace"}
     assert utf8.reconfigured is None
+
+
+def _client_that_cannot_reach_abs_pages(monkeypatch):
+    """An ArxivClient whose every HTTP call fails the way a TLS reset does."""
+    from arxiv_agent.arxiv_client import ArxivClient, ArxivError
+
+    client = ArxivClient(["cs.CV"], cache_dir=None)
+
+    def unavailable(url, accept="*/*"):
+        raise ArxivError("request failed: <urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING]>")
+
+    monkeypatch.setattr(client, "_polite_get", unavailable)
+    return client
+
+
+def test_date_verification_survives_a_flaky_abstract_page(monkeypatch):
+    """One reset connection must not abort a run that has already spent 20 model calls."""
+    client = _client_that_cannot_reach_abs_pages(monkeypatch)
+    paper = make_paper("2609.00031", "A paper whose abs page is unreachable", "abstract")
+    assert client.verify_dates([paper]) == 0  # no exception, no crash
+    assert client.log  # the failure is recorded rather than swallowed
+
+
+def test_enrichment_survives_a_flaky_abstract_page(monkeypatch):
+    client = _client_that_cannot_reach_abs_pages(monkeypatch)
+    paper = make_paper("2609.00032", "Another unreachable record", "")
+    paper.abstract = ""  # forces the enrichment path
+    assert client.enrich_missing([paper]) == 0
+    assert client.log
+
+
+def test_unparseable_atom_record_ends_that_category_instead_of_the_run(monkeypatch):
+    """parse_atom raises ValueError (not ET.ParseError) for a record without a date."""
+    from arxiv_agent import arxiv_client as arxiv_module
+
+    client = arxiv_module.ArxivClient(["cs.CV"], cache_dir=None)
+    monkeypatch.setattr(client, "_cached", lambda tag, loader: "<feed/>")
+
+    def unparseable(body):
+        raise ValueError("no <published> in record")
+
+    monkeypatch.setattr(arxiv_module, "parse_atom", unparseable)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=3)
+    assert client._atom_category("cs.CV", cutoff) == []

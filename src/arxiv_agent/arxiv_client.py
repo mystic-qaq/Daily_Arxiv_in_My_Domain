@@ -333,7 +333,9 @@ class ArxivClient:
                 break
             try:
                 batch = parse_atom(body)
-            except ET.ParseError:
+            except (ET.ParseError, ValueError):
+                # parse_atom also raises ValueError when a record has no readable
+                # <published>; an unexpected body must degrade, not abort the run.
                 break
             if not batch:
                 break
@@ -402,7 +404,13 @@ class ArxivClient:
             if deadline is not None and time.monotonic() > deadline:
                 self.log.append("date verification stopped: time budget reached")
                 break
-            body = self._cached(f"abs:{paper.arxiv_id}", lambda paper=paper: self._polite_get(ABS_URL.format(arxiv_id=paper.arxiv_id), accept="text/html"))
+            try:
+                body = self._cached(f"abs:{paper.arxiv_id}", lambda paper=paper: self._polite_get(ABS_URL.format(arxiv_id=paper.arxiv_id), accept="text/html"))
+            except ArxivError as exc:
+                # One flaky abstract page must never kill a 40-minute run: the
+                # paper keeps its feed date and the caller decides what it is worth.
+                self.log.append(f"abs page failed for {paper.arxiv_id}: {exc}")
+                continue
             if not body:
                 continue
             date_match = ABS_META_DATE.search(body) or ABS_DATE_RE.search(body)
@@ -427,7 +435,13 @@ class ArxivClient:
                 break
             if paper.abstract and not paper.date_uncertain:
                 continue
-            body = self._cached(f"abs:{paper.arxiv_id}", lambda paper=paper: self._polite_get(ABS_URL.format(arxiv_id=paper.arxiv_id), accept="text/html"))
+            try:
+                body = self._cached(f"abs:{paper.arxiv_id}", lambda paper=paper: self._polite_get(ABS_URL.format(arxiv_id=paper.arxiv_id), accept="text/html"))
+            except ArxivError as exc:
+                # Same rule as verify_dates: a transient failure leaves the record
+                # incomplete (and visibly so) instead of ending the whole digest.
+                self.log.append(f"abs page failed for {paper.arxiv_id}: {exc}")
+                continue
             if not body:
                 continue
             abstract_match = ABS_META_ABSTRACT.search(body) or ABS_ABSTRACT_RE.search(body)
