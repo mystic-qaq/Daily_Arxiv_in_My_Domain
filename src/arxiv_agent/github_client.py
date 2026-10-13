@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -48,6 +49,7 @@ class GitHubClient:
         self.search_calls = 0
         self.log: list[str] = []
         self._last_call = 0.0
+        self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ http --
     def _headers(self, accept: str = "application/vnd.github+json") -> dict[str, str]:
@@ -58,19 +60,22 @@ class GitHubClient:
         return headers
 
     def api(self, path: str, search: bool = False) -> dict | None:
-        budget = self.search_budget if search else self.api_budget
-        used = self.search_calls if search else self.calls
-        if used >= budget:
-            self.log.append(f"GitHub {'search' if search else 'core'} budget exhausted before {path}")
-            return None
-        wait = time.monotonic() - self._last_call
-        if wait < 1.0:
-            time.sleep(1.0 - wait)
-        self._last_call = time.monotonic()
-        if search:
-            self.search_calls += 1
-        else:
-            self.calls += 1
+        # Budget check, pacing and counters are one critical section: evidence
+        # prefetching hits this from several threads at once.
+        with self._lock:
+            budget = self.search_budget if search else self.api_budget
+            used = self.search_calls if search else self.calls
+            if used >= budget:
+                self.log.append(f"GitHub {'search' if search else 'core'} budget exhausted before {path}")
+                return None
+            wait = time.monotonic() - self._last_call
+            if wait < 1.0:
+                time.sleep(1.0 - wait)
+            self._last_call = time.monotonic()
+            if search:
+                self.search_calls += 1
+            else:
+                self.calls += 1
         try:
             req = urllib.request.Request(API + path, headers=self._headers())
             with urllib.request.urlopen(req, timeout=self.timeout) as response:

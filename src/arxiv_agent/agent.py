@@ -8,6 +8,7 @@ the pipeline degrades predictably instead of failing halfway through a run.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
@@ -19,7 +20,7 @@ from .arxiv_client import ArxivClient, ArxivError, keep_in_window
 from .config import MAX_CONCURRENCY, Settings
 from .fulltext import FullTextFetcher
 from .github_client import TRENDING_QUERIES, GitHubClient, to_trending_project
-from .llm import CodeBuddyBackend, LLMBackend, build_backend
+from .llm import CachingBackend, CodeBuddyBackend, LLMBackend, OfflineBackend, build_backend
 from .models import Paper, TrendingProject
 from .report import write_report
 from .strategy import StrategyStore
@@ -33,21 +34,25 @@ class _CountingBackend:
         self.inner = inner
         self.calls = 0
         self.failures = 0
+        self._lock = threading.Lock()
 
     @property
     def name(self) -> str:
         return self.inner.name
 
     def complete(self, system: str, user: str, options: Any = None) -> str:
-        self.calls += 1
+        with self._lock:
+            self.calls += 1
         return self.inner.complete(system, user, options)
 
     def complete_json(self, system: str, user: str, options: Any = None) -> Any:
-        self.calls += 1
+        with self._lock:
+            self.calls += 1
         try:
             return self.inner.complete_json(system, user, options)
         except Exception:
-            self.failures += 1
+            with self._lock:
+                self.failures += 1
             raise
 
 
@@ -60,7 +65,11 @@ class DailyArxivAgent:
         self.arxiv = ArxivClient(settings.categories, cache_dir=settings.cache_dir, delay=settings.request_delay)
         self.fulltext = FullTextFetcher(settings.cache_dir)
         self.github = GitHubClient()
-        self.backend = _CountingBackend(backend if backend is not None else build_backend(settings.model, settings.provider, offline=settings.offline))
+        backend = backend if backend is not None else build_backend(settings.model, settings.provider, offline=settings.offline)
+        if not isinstance(backend, OfflineBackend):
+            # Cached replies make same-day reruns and crash recoveries free.
+            backend = CachingBackend(backend, Path(settings.cache_dir) / "llm")
+        self.backend = _CountingBackend(backend)
         self.notes: list[str] = []
         self.started = time.monotonic()
 
@@ -118,7 +127,9 @@ class DailyArxivAgent:
         The live timeout is re-derived from the remaining wall clock before every
         call, leaving room for the retry and the report itself.
         """
-        inner = self.backend.inner
+        inner: Any = self.backend
+        while hasattr(inner, "inner") and not isinstance(inner, CodeBuddyBackend):
+            inner = inner.inner
         if not isinstance(inner, CodeBuddyBackend):
             return
         per_attempt = (self.remaining_seconds() - 30) / max(1, attempts)
@@ -169,10 +180,16 @@ class DailyArxivAgent:
         workers = self.settings.max_concurrency
         judged_rounds = 0
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            for _ in executor.map(lambda batch: judge(batch, self.backend, self.strategy), batches):
+            # Explicit futures: executor.map queues every batch up front, so
+            # breaking out of its iteration cannot actually stop the run.
+            pending = [executor.submit(judge, batch, self.backend, self.strategy) for batch in batches]
+            for future in pending:
+                future.result()
                 judged_rounds += 1
                 if self.budget_exhausted(0.30):
-                    notes.append("模型评审阶段耗时超出预期，已在处理完当前批次后收束。")
+                    notes.append("模型评审阶段耗时超出预期，未完成的批次已取消。")
+                    for rest in pending:
+                        rest.cancel()
                     break
 
         selected, selection_stats = select_portfolio(pool, self.settings, self.strategy)
@@ -192,18 +209,25 @@ class DailyArxivAgent:
             skip_code = True
             notes.append("时间预算紧张：跳过代码抓取，报告中不写“代码与实践”。")
 
-        # (see _tune_model_timeout: the live call timeout follows the wall clock)
-        self._tune_model_timeout(attempts=2)
-
-        def process(paper: Paper) -> Paper:
-            # Re-derive the call budget every time: with two workers sharing the
-            # same wall clock, a fixed timeout cannot keep the run on schedule.
+        # Two stages, not one fused loop: evidence fetching is network-bound and
+        # deep reading is model-bound, so interleaving them inside a worker left
+        # one resource idle whenever the other was busy. Fetch everything first
+        # (attach_repo reads full_text, so the order inside a thread matters),
+        # then spend the LLM workers on analysis only.
+        def fetch_evidence(paper: Paper) -> None:
             remaining = self.remaining_seconds()
             if remaining > 240:
                 text, source, size = self.fulltext(paper, max_chars=fulltext_chars)
                 paper.full_text, paper.full_text_source, paper.full_text_chars = text, source, size
             if not skip_code and remaining > 200:
                 self.github.attach_repo(paper)
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            list(executor.map(fetch_evidence, selected))
+
+        def analyze(paper: Paper) -> Paper:
+            # Re-derive the call budget every time: with two workers sharing the
+            # same wall clock, a fixed timeout cannot keep the run on schedule.
             if self.remaining_seconds() < 90:
                 from .analyze import _degraded
 
@@ -214,7 +238,7 @@ class DailyArxivAgent:
             return paper
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            list(executor.map(process, selected))
+            list(executor.map(analyze, selected))
         # Only worth calling if most papers actually got analysed.
         daily_note_worth_it = sum(1 for p in selected if not p.analysis.get("confidence", "").startswith("低")) >= 2
 

@@ -14,13 +14,16 @@ One interface (:class:`LLMBackend`) with three implementations:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 JSON_RETRY_SYSTEM = (
@@ -180,6 +183,56 @@ class OfflineBackend(LLMBackend):
         if "triage" in system:
             return {"results": []}
         return {}
+
+
+class CachingBackend(LLMBackend):
+    """Disk cache for model replies, so reruns and crash recoveries are free.
+
+    The key covers the backend name, model, both prompt halves and the
+    generation options, so any prompt change invalidates naturally. Failures
+    and empty replies are never cached; cache I/O errors never break a run.
+    """
+
+    def __init__(self, inner: LLMBackend, cache_dir: Path | str):
+        self.inner = inner
+        self.cache_dir = Path(cache_dir)
+
+    @property
+    def name(self) -> str:
+        return self.inner.name
+
+    def _path(self, system: str, user: str, options: GenOptions) -> Path:
+        material = "\x00".join([
+            self.inner.name,
+            str(getattr(self.inner, "model", "")),
+            str(options.max_output_tokens),
+            str(options.temperature),
+            str(options.json_mode),
+            system,
+            user,
+        ])
+        return self.cache_dir / f"{hashlib.sha1(material.encode('utf-8')).hexdigest()}.txt"
+
+    def complete(self, system: str, user: str, options: GenOptions | None = None) -> str:
+        options = options or GenOptions()
+        path = self._path(system, user, options)
+        try:
+            if path.exists():
+                return path.read_text(encoding="utf-8")
+        except OSError:
+            pass
+        result = self.inner.complete(system, user, options)
+        if result.strip():
+            try:
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+                # Unique temp + os.replace: two workers racing the same key can
+                # never leave a half-written file behind.
+                tmp = self.cache_dir / f".{path.stem}.{threading.get_ident()}.tmp"
+                tmp.write_text(result, encoding="utf-8")
+                os.replace(tmp, path)
+            except OSError:
+                pass
+        return result
 
 
 def resolve_provider(model: str, explicit: str = "") -> str:

@@ -156,8 +156,14 @@ def test_rss_item_without_a_readable_date_is_flagged_and_dated_from_the_id():
 
 
 def test_ids_from_earlier_months_never_survive_a_short_window():
-    old = make_paper("2605.13018", "Old object reconstruction", "We reconstruct objects.")
-    fresh = make_paper("2609.19999", "Fresh object reconstruction", "We reconstruct objects.")
+    # Ids must follow the calendar, not a hardcoded month: "fresh" means an id
+    # from the current month, "old" from the previous one.
+    now = datetime.now(timezone.utc)
+    current_id = f"{now.year % 100:02d}{now.month:02d}.19999"
+    last_month = now.replace(day=1) - timedelta(days=1)
+    old_id = f"{last_month.year % 100:02d}{last_month.month:02d}.13018"
+    old = make_paper(old_id, "Old object reconstruction", "We reconstruct objects.")
+    fresh = make_paper(current_id, "Fresh object reconstruction", "We reconstruct objects.")
     cutoff = datetime.now(timezone.utc) - timedelta(days=3)
     assert keep_in_window(fresh, cutoff) is True
     assert keep_in_window(old, cutoff) is False
@@ -219,6 +225,53 @@ class StubBackend:
 
     def complete_json(self, system, user, options=None):
         return {"results": [dict(verdict, id=key) for key, verdict in self.verdicts.items()]}
+
+
+def test_caching_backend_replays_identical_requests(tmp_path):
+    from arxiv_agent.llm import CachingBackend, LLMBackend
+
+    class CountingInner(LLMBackend):
+        name = "stub"
+
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, system, user, options=None):
+            self.calls += 1
+            return f"reply-{self.calls}"
+
+    inner = CountingInner()
+    cached = CachingBackend(inner, tmp_path)
+    assert cached.complete("sys", "user") == "reply-1"
+    assert cached.complete("sys", "user") == "reply-1"  # replayed, not re-called
+    assert inner.calls == 1
+    # A different prompt or different options must miss the cache.
+    assert cached.complete("sys", "other") == "reply-2"
+    assert inner.calls == 2
+
+
+def test_caching_backend_never_caches_empty_or_failed_replies(tmp_path):
+    from arxiv_agent.llm import CachingBackend, LLMBackend
+
+    class FlakyInner(LLMBackend):
+        name = "stub"
+
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, system, user, options=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("transient")
+            return ""
+
+    inner = FlakyInner()
+    cached = CachingBackend(inner, tmp_path)
+    with pytest.raises(RuntimeError):
+        cached.complete("sys", "user")
+    assert cached.complete("sys", "user") == ""  # failure was not cached
+    assert inner.calls == 2
+    assert not list(tmp_path.glob("*.txt"))  # empty replies stay uncached too
 
 
 def test_screen_keeps_lineage_papers_and_can_still_pass_through_the_rest():
